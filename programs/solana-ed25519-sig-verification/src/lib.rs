@@ -38,8 +38,6 @@ pub mod utils {
 
         check_data(&ix.data, msg, sig, pubkey)?;
 
-        msg!("Data that failed Ec25519 sig verification:\n\n{:?}\n", ix.data);
-
         Ok(())
     }
 

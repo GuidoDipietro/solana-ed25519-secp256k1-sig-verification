@@ -12,6 +12,7 @@ describe('signatures', () => {
     // Stuff
     const MSG = Uint8Array.from(Buffer.from("this is such a good message to sign"));
     let person: anchor.web3.Keypair;
+    let signature: Uint8Array;
 
     before(async () => {
         // Create and fund person
@@ -23,15 +24,15 @@ describe('signatures', () => {
             ),
             "processed"
         );
-    });
 
-    it('Verifies correct signature', async () => {
         // Calculate Ed25519 signature
-        let signature = await ed.sign(
+        signature = await ed.sign(
             MSG,
             person.secretKey.slice(0,32)
         );
+    });
 
+    it('Verifies correct signature', async () => {
         // Construct transaction made of 2 instructions:
         //      - Ed25519 sig verification instruction to the Ed25519Program
         //      - Custom instruction to our program
@@ -81,12 +82,6 @@ describe('signatures', () => {
     });
 
     it('Fails to verify wrong signature', async () => {
-        // Calculate Ed25519 signature
-        let signature = await ed.sign(
-            MSG,
-            person.secretKey.slice(0,32)
-        );
-
         // Wrong message in order for sig verification to fail
         const WRONG_MSG = Uint8Array.from(Buffer.from("wrong message"));
 
@@ -141,12 +136,6 @@ describe('signatures', () => {
     });
 
     it('Fails to execute custom instruction if Ed25519Program sig verification is missing', async () => {
-        // Calculate Ed25519 signature
-        let signature = await ed.sign(
-            MSG,
-            person.secretKey.slice(0,32)
-        );
-
         // Everything is correct, but since we did not attach the Ed25519Program
         // instruction, our custom instruction will fail to execute.
         let tx = new anchor.web3.Transaction().add(
