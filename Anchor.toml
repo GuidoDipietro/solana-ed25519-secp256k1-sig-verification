@@ -1,0 +1,14 @@
+[features]
+seeds = false
+[programs.localnet]
+signatures = "DHxesXA69rUmz5AJ1CnLCQezUzQR5j7KKTwTp1zZPc9j"
+
+[registry]
+url = "https://anchor.projectserum.com"
+
+[provider]
+cluster = "localnet"
+wallet = "/home/gedos/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
