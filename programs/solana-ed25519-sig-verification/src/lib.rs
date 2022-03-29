@@ -109,6 +109,6 @@ pub struct Verify<'info> {
 
 #[error]
 pub enum ErrorCode {
-    #[msg("EC25519 signature verification failed.")]
+    #[msg("Ed25519 signature verification failed.")]
     SigVerificationFailed,
 }
