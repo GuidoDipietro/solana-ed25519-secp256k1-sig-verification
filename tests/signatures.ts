@@ -132,7 +132,7 @@ describe('signatures', () => {
             return;
         }
 
-        // assert.fail("Should have failed to verify an invalid Ed25519 signature.");
+        assert.fail("Should have failed to verify an invalid Ed25519 signature.");
     });
 
     it('Fails to execute custom instruction if Ed25519Program sig verification is missing', async () => {
@@ -169,5 +169,63 @@ describe('signatures', () => {
         }
 
         assert.fail("Should have failed to execute custom instruction with missing Ed25519Program instruction.");
+    });
+
+    it('Fails to execute custom instruction if Ed25519Program ix corresponds to another signature', async () => {
+        // Let's send an Ed25519Program instruction that gets verified,
+        // but that does not correspond to the message we need to verify
+
+        const OTHER_MSG = Uint8Array.from(Buffer.from("this is another pretty message"));
+        let other_signature: Uint8Array = await ed.sign(
+            OTHER_MSG,
+            person.secretKey.slice(0,32)
+        );
+
+        // Transaction with two instructions:
+        //      - Ed25519Program instruction with successful signature verification
+        //      - Custom instruction with different params
+        // The transaction will get rejected because transaction introspection will
+        // find that the Ed25519Program instruction that we submitted does not match
+        // the arguments of our custom transaction.
+        let tx = new anchor.web3.Transaction().add(
+            // Ed25519 instruction (suceeds)
+            anchor.web3.Ed25519Program.createInstructionWithPublicKey(
+                {
+                    publicKey: person.publicKey.toBytes(),
+                    message: OTHER_MSG,
+                    signature: other_signature,
+                }
+            )
+        ).add(
+            // Our instruction (fails due to introspection checks)
+            program.instruction.verify(
+                Buffer.from(MSG),
+                Buffer.from(signature),
+                person.publicKey.toBuffer(),
+                {
+                    accounts: {
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    },
+                    signers: [person]
+                }
+            )
+        );
+
+        // Send tx
+        try {
+            await anchor.web3.sendAndConfirmTransaction(
+                program.provider.connection,
+                tx,
+                [person]
+            );
+        } catch (error) {
+            // No idea how to catch this error properly, Solana is weird
+            // assert.equal(error.msg, "EC25519 signature verification failed.");
+            assert.ok(error.logs.join("").includes("Custom program error: 0x1770"));
+            return;
+        }
+
+        assert.fail("Should have failed after introspection checks.");
     });
 });
