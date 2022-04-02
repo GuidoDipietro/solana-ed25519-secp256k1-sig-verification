@@ -4,7 +4,7 @@ import { Signatures } from '../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
 
-describe('signatures', () => {
+describe('Solana signatures', () => {
     anchor.setProvider(anchor.Provider.env());
 
     const program = anchor.workspace.Signatures as Program<Signatures>;
@@ -53,10 +53,10 @@ describe('signatures', () => {
             )
         ).add(
             // Our instruction
-            program.instruction.verify(
+            program.instruction.verifyEd25519(
+                person.publicKey.toBuffer(),
                 Buffer.from(MSG),
                 Buffer.from(signature),
-                person.publicKey.toBuffer(),
                 {
                     accounts: {
                         sender: person.publicKey,
@@ -105,10 +105,10 @@ describe('signatures', () => {
             )
         ).add(
             // Our instruction
-            program.instruction.verify(
+            program.instruction.verifyEd25519(
+                person.publicKey.toBuffer(),
                 Buffer.from(MSG),
                 Buffer.from(signature),
-                person.publicKey.toBuffer(),
                 {
                     accounts: {
                         sender: person.publicKey,
@@ -140,10 +140,10 @@ describe('signatures', () => {
         // instruction, our custom instruction will fail to execute.
         let tx = new anchor.web3.Transaction().add(
             // Our instruction
-            program.instruction.verify(
+            program.instruction.verifyEd25519(
+                person.publicKey.toBuffer(),
                 Buffer.from(MSG),
                 Buffer.from(signature),
-                person.publicKey.toBuffer(),
                 {
                     accounts: {
                         sender: person.publicKey,
@@ -198,10 +198,10 @@ describe('signatures', () => {
             )
         ).add(
             // Our instruction (fails due to introspection checks)
-            program.instruction.verify(
+            program.instruction.verifyEd25519(
+                person.publicKey.toBuffer(),
                 Buffer.from(MSG),
                 Buffer.from(signature),
-                person.publicKey.toBuffer(),
                 {
                     accounts: {
                         sender: person.publicKey,
