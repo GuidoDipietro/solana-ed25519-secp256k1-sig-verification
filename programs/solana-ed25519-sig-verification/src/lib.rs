@@ -72,7 +72,7 @@ pub mod utils {
         Ok(())
     }
 
-    /// Verify Secp256k1 instruction fields
+    /// Verify Secp256k1Program instruction fields
     pub fn verify_secp256k1_ix(ix: &Instruction, eth_address: &[u8], msg: &[u8], sig: &[u8], recovery_id: u8) -> ProgramResult {
         if  ix.program_id       != SECP256K1_ID                 ||  // The program id we expect
             ix.accounts.len()   != 0                            ||  // With no context accounts

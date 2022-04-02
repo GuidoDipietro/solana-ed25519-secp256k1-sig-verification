@@ -163,7 +163,7 @@ describe('Solana signatures', () => {
             );
         } catch (error) {
             // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "EC25519 signature verification failed.");
+            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(error.logs.join("").includes("Custom program error: 0x1770"));
             return;
         }
@@ -221,7 +221,7 @@ describe('Solana signatures', () => {
             );
         } catch (error) {
             // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "EC25519 signature verification failed.");
+            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(error.logs.join("").includes("Custom program error: 0x1770"));
             return;
         }
