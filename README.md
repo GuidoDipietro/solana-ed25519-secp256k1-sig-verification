@@ -16,7 +16,6 @@ In doing so, these are the possible outcomes:
 - ❌ Native program instruction not supplied or supplied with wrong values -> Custom instruction fails to check that the Native program instruction was sent with the proper data, therefore gets rejected.
 - ✅ Native program instruction succeeds -> Custom instruction gets executed -> Custom instruction checks that the Native program instruction was sent with the proper data -> If that succeeds, we can say that Custom instruction indirectly verified the signature.
 
-
 ### Instruction introspection
 
 `solana_program` provides us with the [`load_instruction_at_checked`](https://docs.rs/solana-program/latest/solana_program/sysvar/instructions/fn.load_instruction_at_checked.html) function on the `Instructions Sysvar`, that allows us to recover the raw fields of an instruction at a given index (fields are `program_id, accounts, data`).

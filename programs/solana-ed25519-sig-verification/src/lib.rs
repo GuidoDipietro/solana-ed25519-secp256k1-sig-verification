@@ -8,8 +8,8 @@ use anchor_lang::prelude::*;
 use solana_program::instruction::Instruction;
 use solana_program::sysvar::instructions::{ID as IX_ID, load_instruction_at_checked};
 
-use solana_program::ed25519_program::{ID as ED25519_ID};
-use solana_program::secp256k1_program::{ID as SECP256K1_ID};
+use solana_program::ed25519_program::ID as ED25519_ID;
+use solana_program::secp256k1_program::ID as SECP256K1_ID;
 
 use std::convert::TryInto;
 
@@ -210,7 +210,7 @@ pub mod utils {
 pub struct Verify<'info> {
     pub sender: Signer<'info>,
 
-    /// The address check is needed because otherwise
+    /// CHECK: The address check is needed because otherwise
     /// the supplied Sysvar could be anything else.
     /// The Instruction Sysvar has not been implemented
     /// in the Anchor framework yet, so this is the safe approach.

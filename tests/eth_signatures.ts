@@ -1,8 +1,9 @@
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { Signatures } from '../target/types/signatures';
-import { ethers } from "ethers";
+import { ethers } from 'ethers';
 import * as assert from 'assert';
+import { concat, keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 
 // Note: The recovery byte for Secp256k1 signatures has an arbitrary constant of 27 added for these
 //       Ethereum and Bitcoin signatures. This is why you will see (recoveryId - 27) throughout the tests.
@@ -19,28 +20,28 @@ describe('Ethereum Signatures', () => {
     const person: anchor.web3.Keypair = anchor.web3.Keypair.generate();
 
     // Stuff
-    const PERSON = {name: "ben", age: 49};      // mock data
-    let eth_address: string;                    // Ethereum address to be recovered and checked against
-    let full_sig: string;                       // 64 bytes + recovery byte
-    let signature: Uint8Array;                  // 64 bytes of sig
-    let recoveryId: number;                     // recovery byte (u8)
-    let actual_message: Buffer;                 // actual signed message with Ethereum Message prefix
+    const PERSON = { name: 'ben', age: 49 }; // mock data
+    let eth_address: string; // Ethereum address to be recovered and checked against
+    let full_sig: string; // 64 bytes + recovery byte
+    let signature: Uint8Array; // 64 bytes of sig
+    let recoveryId: number; // recovery byte (u8)
+    let actual_message: Buffer; // actual signed message with Ethereum Message prefix
 
     /// Sample Create Signature function that signs with ethers signMessage
     async function createSignature(name: string, age: number): Promise<string> {
         // keccak256 hash of the message
         const messageHash: string = ethers.utils.solidityKeccak256(
-            ["string", "uint16"],
-            [name, age],
+            ['string', 'uint16'],
+            [name, age]
         );
-    
+
         // get hash as Uint8Array of size 32
         const messageHashBytes: Uint8Array = ethers.utils.arrayify(messageHash);
-    
+
         // Signed message that is actually this:
         // sign(keccak256("\x19Ethereum Signed Message:\n" + len(messageHash) + messageHash)))
         const signature = await eth_signer.signMessage(messageHashBytes);
-    
+
         return signature;
     }
 
@@ -58,21 +59,28 @@ describe('Ethereum Signatures', () => {
         full_sig = await createSignature(PERSON.name, PERSON.age);
 
         let full_sig_bytes = ethers.utils.arrayify(full_sig);
-        signature = full_sig_bytes.slice(0,64);
+        signature = full_sig_bytes.slice(0, 64);
         recoveryId = full_sig_bytes[64] - 27;
         // ^ Why - 27? Check https://ethereum.github.io/yellowpaper/paper.pdf page 27.
 
         // The message we have to check against is actually this
         // "\x19Ethereum Signed Message:\n" + "32" + keccak256(msg)
         // Since we're hashing with keccak256 the msg len is always 32
-        let msg_digest = ethers.utils.arrayify(ethers.utils.solidityKeccak256(
-            ["string", "uint16"],
-            [PERSON.name, PERSON.age]
-        ));
-        actual_message = Buffer.concat([Buffer.from("\x19Ethereum Signed Message:\n32"), msg_digest]);
+        let msg_digest = ethers.utils.arrayify(
+            ethers.utils.solidityKeccak256(
+                ['string', 'uint16'],
+                [PERSON.name, PERSON.age]
+            )
+        );
+        actual_message = Buffer.concat([
+            Buffer.from('\x19Ethereum Signed Message:\n32'),
+            msg_digest,
+        ]);
 
         // Calculated Ethereum Address (20 bytes) from public key (32 bytes)
-        eth_address = ethers.utils.computeAddress(eth_signer.publicKey).slice(2);
+        eth_address = ethers.utils
+            .computeAddress(eth_signer.publicKey)
+            .slice(2);
     });
 
     it('Verifies correct Ethereum signature', async () => {
@@ -85,32 +93,32 @@ describe('Ethereum Signatures', () => {
         // If the first instruction doesn't fail and our instruction manages to deserialize
         // the data and check that it is correct, it means that the sig verification was successful.
         // Otherwise it failed.
-        let tx = new anchor.web3.Transaction().add(
-            // Secp256k1 instruction
-            anchor.web3.Secp256k1Program.createInstructionWithEthAddress(
-                {
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Secp256k1 instruction
+                anchor.web3.Secp256k1Program.createInstructionWithEthAddress({
                     ethAddress: eth_address,
                     message: actual_message,
                     signature: signature,
                     recoveryId: recoveryId,
-                }
+                })
             )
-        ).add(
-            // Our instruction
-            program.instruction.verifySecp(
-                ethers.utils.arrayify("0x" + eth_address),
-                Buffer.from(actual_message),
-                Buffer.from(signature),
-                recoveryId,
-                {
-                    accounts: {
-                        sender: person.publicKey,
-                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                    },
-                    signers: [person]
-                }
-            )
-        );
+            .add(
+                // Our instruction
+                program.instruction.verifySecp(
+                    ethers.utils.arrayify('0x' + eth_address),
+                    Buffer.from(actual_message),
+                    Buffer.from(signature),
+                    recoveryId,
+                    {
+                        accounts: {
+                            sender: person.publicKey,
+                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                        },
+                        signers: [person],
+                    }
+                )
+            );
 
         try {
             await anchor.web3.sendAndConfirmTransaction(
@@ -120,9 +128,67 @@ describe('Ethereum Signatures', () => {
             );
 
             // If all goes well, we're good!
+        } catch (error) {
+            assert.fail(
+                `Should not have failed with the following error:\n${error.msg}`
+            );
         }
-        catch (error) {
-            assert.fail(`Should not have failed with the following error:\n${error.msg}`);
+    });
+
+    it('Verifies chip signature', async () => {
+        const chip_eth_address = '1aaBF638eC3c4A5C2D5cD14fd460Fee2c364c579';
+        const chip_actual_message = Buffer.concat([
+            Buffer.from('\x19Ethereum Signed Message:\n3'),
+            Buffer.from([0x01, 0x02, 0x03]),
+        ]);
+        const chip_signature = Uint8Array.from(
+            Buffer.from(
+                '93137bc7bfeaa86e26c6a9bbd6fb8acdf73ed5fd232cc2be1a0714f583f04d2e' +
+                    '7f5d7c2461daf8649587c3c510fce05a74146cbe79341427065d0d878d154a1b',
+                'hex'
+            )
+        );
+        const chip_recoveryId = 27 - 27;
+
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Secp256k1 instruction
+                anchor.web3.Secp256k1Program.createInstructionWithEthAddress({
+                    ethAddress: chip_eth_address,
+                    message: chip_actual_message,
+                    signature: chip_signature,
+                    recoveryId: chip_recoveryId,
+                })
+            )
+            .add(
+                // Our instruction
+                program.instruction.verifySecp(
+                    ethers.utils.arrayify('0x' + chip_eth_address),
+                    Buffer.from(chip_actual_message),
+                    Buffer.from(chip_signature),
+                    chip_recoveryId,
+                    {
+                        accounts: {
+                            sender: person.publicKey,
+                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                        },
+                        signers: [person],
+                    }
+                )
+            );
+
+        try {
+            await anchor.web3.sendAndConfirmTransaction(
+                program.provider.connection,
+                tx,
+                [person]
+            );
+
+            // If all goes well, we're good!
+        } catch (error) {
+            assert.fail(
+                `Should not have failed with the following error:\n${error.msg}`
+            );
         }
     });
 
@@ -136,32 +202,32 @@ describe('Ethereum Signatures', () => {
         // If the first instruction doesn't fail and our instruction manages to deserialize
         // the data and check that it is correct, it means that the sig verification was successful.
         // Otherwise it failed.
-        let tx = new anchor.web3.Transaction().add(
-            // Secp256k1 instruction
-            anchor.web3.Secp256k1Program.createInstructionWithEthAddress(
-                {
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Secp256k1 instruction
+                anchor.web3.Secp256k1Program.createInstructionWithEthAddress({
                     ethAddress: eth_address,
-                    message: Buffer.from("bad message"), // will fail to verify
+                    message: Buffer.from('bad message'), // will fail to verify
                     signature: signature,
                     recoveryId: recoveryId,
-                }
+                })
             )
-        ).add(
-            // Our instruction
-            program.instruction.verifySecp(
-                ethers.utils.arrayify("0x" + eth_address),
-                Buffer.from(actual_message),
-                Buffer.from(signature),
-                recoveryId,
-                {
-                    accounts: {
-                        sender: person.publicKey,
-                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                    },
-                    signers: [person]
-                }
-            )
-        );
+            .add(
+                // Our instruction
+                program.instruction.verifySecp(
+                    ethers.utils.arrayify('0x' + eth_address),
+                    Buffer.from(actual_message),
+                    Buffer.from(signature),
+                    recoveryId,
+                    {
+                        accounts: {
+                            sender: person.publicKey,
+                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                        },
+                        signers: [person],
+                    }
+                )
+            );
 
         // Send tx
         try {
@@ -172,11 +238,19 @@ describe('Ethereum Signatures', () => {
             );
         } catch (error) {
             // No idea how to catch this error otherwise
-            assert.ok(error.toString().includes("failed to send transaction: Transaction precompile verification failure InvalidAccountIndex"));
+            assert.ok(
+                error
+                    .toString()
+                    .includes(
+                        'failed to send transaction: Transaction precompile verification failure InvalidAccountIndex'
+                    )
+            );
             return;
         }
 
-        assert.fail("Should have failed to verify an invalid Secp256k1 signature.");
+        assert.fail(
+            'Should have failed to verify an invalid Secp256k1 signature.'
+        );
     });
 
     it('Fails to execute custom instruction if Secp256k1Program sig verification is missing', async () => {
@@ -185,7 +259,7 @@ describe('Ethereum Signatures', () => {
         let tx = new anchor.web3.Transaction().add(
             // Our instruction
             program.instruction.verifySecp(
-                ethers.utils.arrayify("0x" + eth_address),
+                ethers.utils.arrayify('0x' + eth_address),
                 Buffer.from(actual_message),
                 Buffer.from(signature),
                 recoveryId,
@@ -194,7 +268,7 @@ describe('Ethereum Signatures', () => {
                         sender: person.publicKey,
                         ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
                     },
-                    signers: [person]
+                    signers: [person],
                 }
             )
         );
@@ -209,11 +283,15 @@ describe('Ethereum Signatures', () => {
         } catch (error) {
             // No idea how to catch this error properly, Solana is weird
             // assert.equal(error.msg, "Signature verification failed.");
-            assert.ok(error.logs.join("").includes("Custom program error: 0x1770"));
+            assert.ok(
+                error.logs.join('').includes('Custom program error: 0x1770')
+            );
             return;
         }
 
-        assert.fail("Should have failed to execute custom instruction with missing Ed25519Program instruction.");
+        assert.fail(
+            'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
+        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program ix corresponds to another signature', async () => {
@@ -221,17 +299,22 @@ describe('Ethereum Signatures', () => {
         // but that does not correspond to the message we need to verify
 
         // See before() for details
-        const SOMEONE = {name: "anatoly", age: 48};
+        const SOMEONE = { name: 'anatoly', age: 48 };
 
         let other_full_sig = await createSignature(SOMEONE.name, SOMEONE.age);
         let other_full_sig_bytes = ethers.utils.arrayify(other_full_sig);
-        let other_signature = other_full_sig_bytes.slice(0,64);
+        let other_signature = other_full_sig_bytes.slice(0, 64);
         let other_recoveryId = other_full_sig_bytes[64] - 27;
-        let other_msg_digest = ethers.utils.arrayify(ethers.utils.solidityKeccak256(
-            ["string", "uint16"],
-            [SOMEONE.name, SOMEONE.age]
-        ));
-        let other_actual_message = Buffer.concat([Buffer.from("\x19Ethereum Signed Message:\n32"), other_msg_digest]);
+        let other_msg_digest = ethers.utils.arrayify(
+            ethers.utils.solidityKeccak256(
+                ['string', 'uint16'],
+                [SOMEONE.name, SOMEONE.age]
+            )
+        );
+        let other_actual_message = Buffer.concat([
+            Buffer.from('\x19Ethereum Signed Message:\n32'),
+            other_msg_digest,
+        ]);
 
         // Transaction with two instructions:
         //      - Secp256k1Program instruction with successful signature verification
@@ -239,32 +322,32 @@ describe('Ethereum Signatures', () => {
         // The transaction will get rejected because transaction introspection will
         // find that the Secp256k1Program instruction that we submitted does not match
         // the arguments of our custom transaction.
-        let tx = new anchor.web3.Transaction().add(
-            // Secp256k1 instruction (suceeds)
-            anchor.web3.Secp256k1Program.createInstructionWithEthAddress(
-                {
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Secp256k1 instruction (suceeds)
+                anchor.web3.Secp256k1Program.createInstructionWithEthAddress({
                     ethAddress: eth_address,
                     message: other_actual_message,
                     signature: other_signature,
                     recoveryId: other_recoveryId,
-                }
+                })
             )
-        ).add(
-            // Our instruction (fails due to introspection checks)
-            program.instruction.verifySecp(
-                ethers.utils.arrayify("0x" + eth_address),
-                Buffer.from(actual_message),
-                Buffer.from(signature),
-                recoveryId,
-                {
-                    accounts: {
-                        sender: person.publicKey,
-                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                    },
-                    signers: [person]
-                }
-            )
-        );
+            .add(
+                // Our instruction (fails due to introspection checks)
+                program.instruction.verifySecp(
+                    ethers.utils.arrayify('0x' + eth_address),
+                    Buffer.from(actual_message),
+                    Buffer.from(signature),
+                    recoveryId,
+                    {
+                        accounts: {
+                            sender: person.publicKey,
+                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                        },
+                        signers: [person],
+                    }
+                )
+            );
 
         // Send tx
         try {
@@ -276,10 +359,12 @@ describe('Ethereum Signatures', () => {
         } catch (error) {
             // No idea how to catch this error properly, Solana is weird
             // assert.equal(error.msg, "Signature verification failed.");
-            assert.ok(error.logs.join("").includes("Custom program error: 0x1770"));
+            assert.ok(
+                error.logs.join('').includes('Custom program error: 0x1770')
+            );
             return;
         }
 
-        assert.fail("Should have failed after introspection checks.");
+        assert.fail('Should have failed after introspection checks.');
     });
 });
