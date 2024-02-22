@@ -1,5 +1,5 @@
 //! Very reduced Solana program that indirectly validates
-//! Ed25519 signatures by using instruction introspection
+//! Ed25519/Secp256k1 signatures by using instruction introspection
 //!
 //! Made for learning / teaching / example purposes.
 //!
