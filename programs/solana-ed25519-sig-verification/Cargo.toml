@@ -16,5 +16,5 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.21.0"
-solana-program = "1.10.4"
+anchor-lang = "0.29.0"
+solana-program = "1.18.2"

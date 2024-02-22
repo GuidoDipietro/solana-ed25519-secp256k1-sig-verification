@@ -3,7 +3,6 @@ import { Program } from '@project-serum/anchor';
 import { Signatures } from '../target/types/signatures';
 import { ethers } from 'ethers';
 import * as assert from 'assert';
-import { concat, keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 
 // Note: The recovery byte for Secp256k1 signatures has an arbitrary constant of 27 added for these
 //       Ethereum and Bitcoin signatures. This is why you will see (recoveryId - 27) throughout the tests.
@@ -11,7 +10,8 @@ import { concat, keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 // Ref:  https://ethereum.github.io/yellowpaper/paper.pdf
 
 describe('Ethereum Signatures', () => {
-    anchor.setProvider(anchor.Provider.env());
+    const provider = anchor.Provider.env();
+    anchor.setProvider(provider);
 
     const program = anchor.workspace.Signatures as Program<Signatures>;
 
@@ -47,12 +47,17 @@ describe('Ethereum Signatures', () => {
 
     before(async () => {
         // Fund person
-        await program.provider.connection.confirmTransaction(
-            await program.provider.connection.requestAirdrop(
-                person.publicKey,
-                5 * anchor.web3.LAMPORTS_PER_SOL
-            )
+        let txid = await provider.connection.requestAirdrop(
+            person.publicKey,
+            5 * anchor.web3.LAMPORTS_PER_SOL
         );
+        let { blockhash, lastValidBlockHeight } =
+            await provider.connection.getLatestBlockhash();
+        await provider.connection.confirmTransaction({
+            signature: txid,
+            blockhash,
+            lastValidBlockHeight,
+        });
 
         // Signature
         // Full sig consists of 64 bytes + recovery byte
@@ -122,7 +127,7 @@ describe('Ethereum Signatures', () => {
 
         try {
             await anchor.web3.sendAndConfirmTransaction(
-                program.provider.connection,
+                provider.connection,
                 tx,
                 [person]
             );
@@ -179,7 +184,7 @@ describe('Ethereum Signatures', () => {
 
         try {
             await anchor.web3.sendAndConfirmTransaction(
-                program.provider.connection,
+                provider.connection,
                 tx,
                 [person]
             );
@@ -232,7 +237,7 @@ describe('Ethereum Signatures', () => {
         // Send tx
         try {
             await anchor.web3.sendAndConfirmTransaction(
-                program.provider.connection,
+                provider.connection,
                 tx,
                 [person]
             );
@@ -276,7 +281,7 @@ describe('Ethereum Signatures', () => {
         // Send tx
         try {
             await anchor.web3.sendAndConfirmTransaction(
-                program.provider.connection,
+                provider.connection,
                 tx,
                 [person]
             );
@@ -284,7 +289,11 @@ describe('Ethereum Signatures', () => {
             // No idea how to catch this error properly, Solana is weird
             // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
-                error.logs.join('').includes('Custom program error: 0x1770')
+                error.logs
+                    .join('')
+                    .includes(
+                        'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
+                    )
             );
             return;
         }
@@ -352,7 +361,7 @@ describe('Ethereum Signatures', () => {
         // Send tx
         try {
             await anchor.web3.sendAndConfirmTransaction(
-                program.provider.connection,
+                provider.connection,
                 tx,
                 [person]
             );
@@ -360,7 +369,11 @@ describe('Ethereum Signatures', () => {
             // No idea how to catch this error properly, Solana is weird
             // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
-                error.logs.join('').includes('Custom program error: 0x1770')
+                error.logs
+                    .join('')
+                    .includes(
+                        'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
+                    )
             );
             return;
         }
