@@ -12,9 +12,9 @@ Therefore, the way to build custom instructions that "do" sig verification is by
 
 In doing so, these are the possible outcomes:
 
-- ❌ Native program instruction fails -> Custom instruction is never executed.
-- ❌ Native program instruction not supplied or supplied with wrong values -> Custom instruction fails to check that the Native program instruction was sent with the proper data, therefore gets rejected.
-- ✅ Native program instruction succeeds -> Custom instruction gets executed -> Custom instruction checks that the Native program instruction was sent with the proper data -> If that succeeds, we can say that Custom instruction indirectly verified the signature.
+-   ❌ Native program instruction fails -> Custom instruction is never executed.
+-   ❌ Native program instruction not supplied or supplied with wrong values -> Custom instruction fails to check that the Native program instruction was sent with the proper data, therefore gets rejected.
+-   ✅ Native program instruction succeeds -> Custom instruction gets executed -> Custom instruction checks that the Native program instruction was sent with the proper data -> If that succeeds, we can say that Custom instruction indirectly verified the signature.
 
 ### Instruction introspection
 
@@ -29,5 +29,5 @@ There are two test files with the same concepts: one, signing using a Solana key
 
 ```bash
 yarn install
-anchor test
+yarn test
 ```
