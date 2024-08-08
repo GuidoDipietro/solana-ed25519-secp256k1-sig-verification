@@ -1,11 +1,11 @@
-import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import * as anchor from '@coral-xyz/anchor';
+import { Program } from '@coral-xyz/anchor';
 import { Signatures } from '../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
 
 describe('Solana signatures', () => {
-    const provider = anchor.Provider.env();
+    const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
 
     const program = anchor.workspace.Signatures as Program<Signatures>;
@@ -58,27 +58,31 @@ describe('Solana signatures', () => {
             )
             .add(
                 // Our instruction
-                program.instruction.verifyEd25519(
-                    person.publicKey.toBuffer(),
-                    Buffer.from(MSG),
-                    Buffer.from(signature),
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifyEd25519(
+                        Array.from(person.publicKey.toBuffer()),
+                        Buffer.from(MSG),
+                        Array.from(signature)
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
-            );
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
 
             // If all goes well, we're good!
         } catch (error) {
@@ -112,42 +116,41 @@ describe('Solana signatures', () => {
             )
             .add(
                 // Our instruction
-                program.instruction.verifyEd25519(
-                    person.publicKey.toBuffer(),
-                    Buffer.from(MSG),
-                    Buffer.from(signature),
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifyEd25519(
+                        Array.from(person.publicKey.toBuffer()),
+                        Buffer.from(MSG),
+                        Array.from(signature)
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail(
+                'Should have failed to verify an invalid Ed25519 signature.'
             );
         } catch (error) {
-            // No idea how to catch this error otherwise
-            assert.ok(
-                error
-                    .toString()
-                    .includes(
-                        'failed to send transaction: Transaction precompile verification failure InvalidAccountIndex'
-                    )
+            assert.equal(
+                error.transactionMessage,
+                'Transaction precompile verification failure InvalidAccountIndex'
             );
-            return;
         }
-
-        assert.fail(
-            'Should have failed to verify an invalid Ed25519 signature.'
-        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program sig verification is missing', async () => {
@@ -155,30 +158,36 @@ describe('Solana signatures', () => {
         // instruction, our custom instruction will fail to execute.
         let tx = new anchor.web3.Transaction().add(
             // Our instruction
-            program.instruction.verifyEd25519(
-                person.publicKey.toBuffer(),
-                Buffer.from(MSG),
-                Buffer.from(signature),
-                {
-                    accounts: {
-                        sender: person.publicKey,
-                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                    },
-                    signers: [person],
-                }
-            )
+            await program.methods
+                .verifyEd25519(
+                    Array.from(person.publicKey.toBuffer()),
+                    Buffer.from(MSG),
+                    Array.from(signature)
+                )
+                .accounts({
+                    sender: person.publicKey,
+                    ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                })
+                .signers([person])
+                .instruction()
         );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail(
+                'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
             );
         } catch (error) {
-            // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
                 error.logs
                     .join('')
@@ -186,12 +195,7 @@ describe('Solana signatures', () => {
                         'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
                     )
             );
-            return;
         }
-
-        assert.fail(
-            'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
-        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program ix corresponds to another signature', async () => {
@@ -223,30 +227,34 @@ describe('Solana signatures', () => {
             )
             .add(
                 // Our instruction (fails due to introspection checks)
-                program.instruction.verifyEd25519(
-                    person.publicKey.toBuffer(),
-                    Buffer.from(MSG),
-                    Buffer.from(signature),
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifyEd25519(
+                        Array.from(person.publicKey.toBuffer()),
+                        Buffer.from(MSG),
+                        Array.from(signature)
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
-            );
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail('Should have failed after introspection checks.');
         } catch (error) {
-            // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
                 error.logs
                     .join('')
@@ -254,9 +262,6 @@ describe('Solana signatures', () => {
                         'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
                     )
             );
-            return;
         }
-
-        assert.fail('Should have failed after introspection checks.');
     });
 });
