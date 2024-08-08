@@ -301,4 +301,62 @@ describe('Solana signatures', () => {
             res.meta.logMessages.join('').includes('SigVerificationFailed')
         );
     });
+
+    // Doesn't work on Bankrun...
+    xit('Fails to execute custom instruction if someone else signed but we try to impersonate', async () => {
+        // We provide a valid signature but for a different key.
+        // Then, we try to impersonate the original signer.
+        // The Ed25519Program notices that the given pubkey can't verify that sig.
+
+        // Other signer
+        const otherPerson = anchor.web3.Keypair.generate();
+        assert.notEqual(
+            person.publicKey.toString(),
+            otherPerson.publicKey.toString()
+        );
+
+        // Other signature
+        const otherSignature = await ed.sign(
+            MSG,
+            otherPerson.secretKey.slice(0, 32)
+        );
+
+        // Build tx
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Ed25519 instruction
+                anchor.web3.Ed25519Program.createInstructionWithPublicKey({
+                    publicKey: person.publicKey.toBytes(),
+                    message: MSG,
+                    signature: otherSignature, // this shouldn't verify!
+                })
+            )
+            .add(
+                // Our instruction
+                await program.methods
+                    .verifyEd25519(
+                        Array.from(person.publicKey.toBuffer()),
+                        Buffer.from(MSG),
+                        Array.from(otherSignature) // this will match above, but above shouldn't pass
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
+            );
+
+        // Send tx
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
+
+        tx.sign(person);
+
+        const res = await context.banksClient.tryProcessTransaction(tx);
+
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
+    });
 });

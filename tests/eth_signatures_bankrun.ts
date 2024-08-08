@@ -29,7 +29,11 @@ describe('Ethereum Signatures', () => {
     let actual_message: Buffer; // actual signed message with Ethereum Message prefix
 
     /// Sample Create Signature function that signs with ethers signMessage
-    async function createSignature(name: string, age: number): Promise<string> {
+    async function createSignature(
+        name: string,
+        age: number,
+        signer = eth_signer
+    ): Promise<string> {
         // keccak256 hash of the message
         const messageHash: string = ethers.utils.solidityKeccak256(
             ['string', 'uint16'],
@@ -41,7 +45,7 @@ describe('Ethereum Signatures', () => {
 
         // Signed message that is actually this:
         // sign(keccak256("\x19Ethereum Signed Message:\n" + len(messageHash) + messageHash)))
-        const signature = await eth_signer.signMessage(messageHashBytes);
+        const signature = await signer.signMessage(messageHashBytes);
 
         return signature;
     }
@@ -419,6 +423,66 @@ describe('Ethereum Signatures', () => {
                     .instruction()
             );
 
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
+
+        tx.sign(person);
+
+        const res = await context.banksClient.tryProcessTransaction(tx);
+
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
+    });
+
+    // Doesn't work on Bankrun...
+    xit('Fails to execute custom instruction if someone else signed but we try to impersonate', async () => {
+        // We provide a valid signature but for a different key.
+        // Then, we try to impersonate the original signer.
+        // The Ed25519Program notices that the given pubkey can't verify that sig.
+
+        // Other signer
+        const otherEthSigner = ethers.Wallet.createRandom();
+
+        // Other signature
+        const otherFullSignature = await createSignature(
+            PERSON.name,
+            PERSON.age,
+            otherEthSigner
+        );
+        const otherFullSigBytes = ethers.utils.arrayify(otherFullSignature);
+        const otherSignature = otherFullSigBytes.slice(0, 64);
+        const otherRecoveryId = otherFullSigBytes[64] - 27;
+
+        // Build tx
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Secp256k1 instruction
+                anchor.web3.Secp256k1Program.createInstructionWithEthAddress({
+                    ethAddress: eth_address,
+                    message: actual_message,
+                    signature: otherSignature, // these shouldn't verify
+                    recoveryId: otherRecoveryId, // these shouldn't verify
+                })
+            )
+            .add(
+                // Our instruction
+                await program.methods
+                    .verifySecp(
+                        Array.from(ethers.utils.arrayify('0x' + eth_address)),
+                        Buffer.from(actual_message),
+                        Array.from(otherSignature), // this will match above, but above shouldn't pass
+                        otherRecoveryId // this will match above, but above shouldn't pass
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
+            );
+
+        // Send tx
         tx.recentBlockhash = context.lastBlockhash;
         tx.feePayer = person.publicKey;
 
