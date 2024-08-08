@@ -1,5 +1,5 @@
-import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import * as anchor from '@coral-xyz/anchor';
+import { Program } from '@coral-xyz/anchor';
 import { Signatures } from '../target/types/signatures';
 import { ethers } from 'ethers';
 import * as assert from 'assert';
@@ -10,7 +10,9 @@ import * as assert from 'assert';
 // Ref:  https://ethereum.github.io/yellowpaper/paper.pdf
 
 describe('Ethereum Signatures', () => {
-    const provider = anchor.Provider.env();
+    const provider = anchor.AnchorProvider.local(undefined, {
+        commitment: `confirmed`,
+    });
     anchor.setProvider(provider);
 
     const program = anchor.workspace.Signatures as Program<Signatures>;
@@ -110,27 +112,31 @@ describe('Ethereum Signatures', () => {
             )
             .add(
                 // Our instruction
-                program.instruction.verifySecp(
-                    ethers.utils.arrayify('0x' + eth_address),
-                    Buffer.from(actual_message),
-                    Buffer.from(signature),
-                    recoveryId,
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifySecp(
+                        Array.from(ethers.utils.arrayify('0x' + eth_address)),
+                        Buffer.from(actual_message),
+                        Array.from(signature),
+                        recoveryId
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
-            );
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
 
             // If all goes well, we're good!
         } catch (error) {
@@ -167,27 +173,33 @@ describe('Ethereum Signatures', () => {
             )
             .add(
                 // Our instruction
-                program.instruction.verifySecp(
-                    ethers.utils.arrayify('0x' + chip_eth_address),
-                    Buffer.from(chip_actual_message),
-                    Buffer.from(chip_signature),
-                    chip_recoveryId,
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifySecp(
+                        Array.from(
+                            ethers.utils.arrayify('0x' + chip_eth_address)
+                        ),
+                        Buffer.from(chip_actual_message),
+                        Array.from(chip_signature),
+                        chip_recoveryId
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
-            );
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
 
             // If all goes well, we're good!
         } catch (error) {
@@ -219,43 +231,42 @@ describe('Ethereum Signatures', () => {
             )
             .add(
                 // Our instruction
-                program.instruction.verifySecp(
-                    ethers.utils.arrayify('0x' + eth_address),
-                    Buffer.from(actual_message),
-                    Buffer.from(signature),
-                    recoveryId,
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifySecp(
+                        Array.from(ethers.utils.arrayify('0x' + eth_address)),
+                        Buffer.from(actual_message),
+                        Array.from(signature),
+                        recoveryId
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail(
+                'Should have failed to verify an invalid Secp256k1 signature.'
             );
         } catch (error) {
-            // No idea how to catch this error otherwise
-            assert.ok(
-                error
-                    .toString()
-                    .includes(
-                        'failed to send transaction: Transaction precompile verification failure InvalidAccountIndex'
-                    )
+            assert.equal(
+                error.transactionMessage,
+                'Transaction precompile verification failure InvalidAccountIndex'
             );
-            return;
         }
-
-        assert.fail(
-            'Should have failed to verify an invalid Secp256k1 signature.'
-        );
     });
 
     it('Fails to execute custom instruction if Secp256k1Program sig verification is missing', async () => {
@@ -263,31 +274,37 @@ describe('Ethereum Signatures', () => {
         // instruction, our custom instruction will fail to execute.
         let tx = new anchor.web3.Transaction().add(
             // Our instruction
-            program.instruction.verifySecp(
-                ethers.utils.arrayify('0x' + eth_address),
-                Buffer.from(actual_message),
-                Buffer.from(signature),
-                recoveryId,
-                {
-                    accounts: {
-                        sender: person.publicKey,
-                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                    },
-                    signers: [person],
-                }
-            )
+            await program.methods
+                .verifySecp(
+                    Array.from(ethers.utils.arrayify('0x' + eth_address)),
+                    Buffer.from(actual_message),
+                    Array.from(signature),
+                    recoveryId
+                )
+                .accounts({
+                    sender: person.publicKey,
+                    ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                })
+                .signers([person])
+                .instruction()
         );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail(
+                'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
             );
         } catch (error) {
-            // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
                 error.logs
                     .join('')
@@ -295,12 +312,7 @@ describe('Ethereum Signatures', () => {
                         'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
                     )
             );
-            return;
         }
-
-        assert.fail(
-            'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
-        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program ix corresponds to another signature', async () => {
@@ -343,31 +355,35 @@ describe('Ethereum Signatures', () => {
             )
             .add(
                 // Our instruction (fails due to introspection checks)
-                program.instruction.verifySecp(
-                    ethers.utils.arrayify('0x' + eth_address),
-                    Buffer.from(actual_message),
-                    Buffer.from(signature),
-                    recoveryId,
-                    {
-                        accounts: {
-                            sender: person.publicKey,
-                            ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-                        },
-                        signers: [person],
-                    }
-                )
+                await program.methods
+                    .verifySecp(
+                        Array.from(ethers.utils.arrayify('0x' + eth_address)),
+                        Buffer.from(actual_message),
+                        Array.from(signature),
+                        recoveryId
+                    )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
 
         // Send tx
         try {
-            await anchor.web3.sendAndConfirmTransaction(
-                provider.connection,
-                tx,
-                [person]
-            );
+            const { lastValidBlockHeight, blockhash } =
+                await provider.connection.getLatestBlockhash();
+            tx.lastValidBlockHeight = lastValidBlockHeight;
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = person.publicKey;
+
+            tx.sign(person);
+
+            await provider.connection.sendRawTransaction(tx.serialize());
+
+            assert.fail('Should have failed after introspection checks.');
         } catch (error) {
-            // No idea how to catch this error properly, Solana is weird
-            // assert.equal(error.msg, "Signature verification failed.");
             assert.ok(
                 error.logs
                     .join('')
@@ -375,9 +391,6 @@ describe('Ethereum Signatures', () => {
                         'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
                     )
             );
-            return;
         }
-
-        assert.fail('Should have failed after introspection checks.');
     });
 });

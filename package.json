@@ -1,7 +1,7 @@
 {
     "dependencies": {
         "@noble/ed25519": "^1.6.0",
-        "@project-serum/anchor": "^0.21.0",
+        "@coral-xyz/anchor": "0.28.0",
         "ethers": "^5.6.2"
     },
     "devDependencies": {
