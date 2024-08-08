@@ -29,5 +29,6 @@ There are two test files with the same concepts: one, signing using a Solana key
 
 ```bash
 yarn install
-yarn test
+anchor build
+yarn test --skip-build
 ```

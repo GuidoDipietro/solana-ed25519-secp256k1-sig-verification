@@ -109,7 +109,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages
+            res.meta?.logMessages
                 .join('')
                 .includes(`Program ${program.programId} success`)
         );
@@ -162,7 +162,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages.join('').includes('SigVerificationFailed')
+            res.meta?.logMessages.join('').includes('SigVerificationFailed')
         );
     });
 
@@ -194,7 +194,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages.join('').includes('SigVerificationFailed')
+            res.meta?.logMessages.join('').includes('SigVerificationFailed')
         );
     });
 
@@ -250,7 +250,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages.join('').includes('SigVerificationFailed')
+            res.meta?.logMessages.join('').includes('SigVerificationFailed')
         );
     });
 
@@ -301,7 +301,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages.join('').includes('SigVerificationFailed')
+            res.meta?.logMessages.join('').includes('SigVerificationFailed')
         );
     });
 
@@ -359,7 +359,7 @@ describe('Solana signatures', () => {
         const res = await context.banksClient.tryProcessTransaction(tx);
 
         assert.ok(
-            res.meta.logMessages.join('').includes('SigVerificationFailed')
+            res.meta?.logMessages.join('').includes('SigVerificationFailed')
         );
     });
 });
