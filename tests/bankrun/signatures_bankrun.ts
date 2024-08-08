@@ -1,6 +1,9 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import { Signatures, IDL as SignaturesIDL } from '../target/types/signatures';
+import {
+    Signatures,
+    IDL as SignaturesIDL,
+} from '../../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
 import { BankrunProvider } from 'anchor-bankrun';
