@@ -1,37 +1,62 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import { Signatures } from '../target/types/signatures';
+import { Signatures, IDL as SignaturesIDL } from '../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
+import { BankrunProvider } from 'anchor-bankrun';
+import { ProgramTestContext, startAnchor } from 'solana-bankrun';
 
 describe('Solana signatures', () => {
-    const provider = anchor.AnchorProvider.env();
-    anchor.setProvider(provider);
-
-    const program = anchor.workspace.Signatures as Program<Signatures>;
+    let provider: BankrunProvider;
+    let context: ProgramTestContext;
+    let program: Program<Signatures>;
 
     // Stuff
     const MSG = Uint8Array.from(
         Buffer.from('this is such a good message to sign')
     );
-    let person: anchor.web3.Keypair;
+    let person = anchor.web3.Keypair.generate();
     let signature: Uint8Array;
 
     before(async () => {
-        // Create and fund person
-        person = anchor.web3.Keypair.generate();
+        // BankrunProvider setup
 
-        let txid = await provider.connection.requestAirdrop(
-            person.publicKey,
-            5 * anchor.web3.LAMPORTS_PER_SOL
+        context = await startAnchor(
+            `./`,
+            [],
+            [
+                {
+                    address: anchor.Wallet.local().publicKey,
+                    info: {
+                        executable: false,
+                        owner: anchor.web3.SystemProgram.programId,
+                        lamports: 1000_000_000_000_000,
+                        data: Buffer.from([]),
+                    },
+                },
+                {
+                    address: person.publicKey,
+                    info: {
+                        executable: false,
+                        owner: anchor.web3.SystemProgram.programId,
+                        lamports: 1000_000_000_000_000,
+                        data: Buffer.from([]),
+                    },
+                },
+            ]
         );
-        let { blockhash, lastValidBlockHeight } =
-            await provider.connection.getLatestBlockhash();
-        await provider.connection.confirmTransaction({
-            signature: txid,
-            blockhash,
-            lastValidBlockHeight,
-        });
+
+        provider = new BankrunProvider(context, anchor.Wallet.local());
+
+        anchor.setProvider(provider);
+
+        // Instantiate program
+
+        program = new Program<Signatures>(
+            SignaturesIDL,
+            anchor.workspace.Signatures.programId,
+            provider
+        );
 
         // Calculate Ed25519 signature
         signature = await ed.sign(MSG, person.secretKey.slice(0, 32));
@@ -73,23 +98,18 @@ describe('Solana signatures', () => {
             );
 
         // Send tx
-        try {
-            const { lastValidBlockHeight, blockhash } =
-                await provider.connection.getLatestBlockhash();
-            tx.lastValidBlockHeight = lastValidBlockHeight;
-            tx.recentBlockhash = blockhash;
-            tx.feePayer = person.publicKey;
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
 
-            tx.sign(person);
+        tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+        const res = await context.banksClient.tryProcessTransaction(tx);
 
-            // If all goes well, we're good!
-        } catch (error) {
-            assert.fail(
-                `Should not have failed with the following error:\n${error.msg}`
-            );
-        }
+        assert.ok(
+            res.meta.logMessages
+                .join('')
+                .includes(`Program ${program.programId} success`)
+        );
     });
 
     it('Fails to verify wrong signature', async () => {
@@ -131,26 +151,16 @@ describe('Solana signatures', () => {
             );
 
         // Send tx
-        try {
-            const { lastValidBlockHeight, blockhash } =
-                await provider.connection.getLatestBlockhash();
-            tx.lastValidBlockHeight = lastValidBlockHeight;
-            tx.recentBlockhash = blockhash;
-            tx.feePayer = person.publicKey;
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
 
-            tx.sign(person);
+        tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+        const res = await context.banksClient.tryProcessTransaction(tx);
 
-            assert.fail(
-                'Should have failed to verify an invalid Ed25519 signature.'
-            );
-        } catch (error) {
-            assert.equal(
-                error.transactionMessage,
-                'Transaction precompile verification failure InvalidAccountIndex'
-            );
-        }
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program sig verification is missing', async () => {
@@ -173,29 +183,16 @@ describe('Solana signatures', () => {
         );
 
         // Send tx
-        try {
-            const { lastValidBlockHeight, blockhash } =
-                await provider.connection.getLatestBlockhash();
-            tx.lastValidBlockHeight = lastValidBlockHeight;
-            tx.recentBlockhash = blockhash;
-            tx.feePayer = person.publicKey;
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
 
-            tx.sign(person);
+        tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+        const res = await context.banksClient.tryProcessTransaction(tx);
 
-            assert.fail(
-                'Should have failed to execute custom instruction with missing Ed25519Program instruction.'
-            );
-        } catch (error) {
-            assert.ok(
-                error.logs
-                    .join('')
-                    .includes(
-                        'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
-                    )
-            );
-        }
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
     });
 
     it('Fails to execute custom instruction if Ed25519Program ix corresponds to another signature', async () => {
@@ -242,26 +239,66 @@ describe('Solana signatures', () => {
             );
 
         // Send tx
-        try {
-            const { lastValidBlockHeight, blockhash } =
-                await provider.connection.getLatestBlockhash();
-            tx.lastValidBlockHeight = lastValidBlockHeight;
-            tx.recentBlockhash = blockhash;
-            tx.feePayer = person.publicKey;
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
 
-            tx.sign(person);
+        tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+        const res = await context.banksClient.tryProcessTransaction(tx);
 
-            assert.fail('Should have failed after introspection checks.');
-        } catch (error) {
-            assert.ok(
-                error.logs
-                    .join('')
-                    .includes(
-                        'Program log: AnchorError occurred. Error Code: SigVerificationFailed'
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
+    });
+
+    it('Fails to execute custom instruction if message was signed by a different key than expected', async () => {
+        // We change the expected eth_address, therefore even
+        // if the message is the same and the signature is valid
+        // it wasn't signed by who we expected so this is rejected.
+
+        // Other signer
+        const otherPerson = anchor.web3.Keypair.generate();
+        assert.notEqual(
+            person.publicKey.toString(),
+            otherPerson.publicKey.toString()
+        );
+
+        // Build tx
+        let tx = new anchor.web3.Transaction()
+            .add(
+                // Ed25519 instruction
+                anchor.web3.Ed25519Program.createInstructionWithPublicKey({
+                    publicKey: person.publicKey.toBytes(),
+                    message: MSG,
+                    signature: signature,
+                })
+            )
+            .add(
+                // Our instruction
+                await program.methods
+                    .verifyEd25519(
+                        Array.from(otherPerson.publicKey.toBuffer()),
+                        Buffer.from(MSG),
+                        Array.from(signature)
                     )
+                    .accounts({
+                        sender: person.publicKey,
+                        ixSysvar: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+                    })
+                    .signers([person])
+                    .instruction()
             );
-        }
+
+        // Send tx
+        tx.recentBlockhash = context.lastBlockhash;
+        tx.feePayer = person.publicKey;
+
+        tx.sign(person);
+
+        const res = await context.banksClient.tryProcessTransaction(tx);
+
+        assert.ok(
+            res.meta.logMessages.join('').includes('SigVerificationFailed')
+        );
     });
 });
