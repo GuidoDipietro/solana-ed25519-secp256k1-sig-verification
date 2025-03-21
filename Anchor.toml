@@ -8,4 +8,4 @@ url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "/home/gedos/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"

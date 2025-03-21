@@ -55,11 +55,7 @@ describe('Solana signatures', () => {
 
         // Instantiate program
 
-        program = new Program<Signatures>(
-            SignaturesIDL,
-            anchor.workspace.Signatures.programId,
-            provider
-        );
+        program = anchor.workspace.Signatures as Program<Signatures>;
 
         // Calculate Ed25519 signature
         signature = await ed.sign(MSG, person.secretKey.slice(0, 32));

@@ -87,11 +87,7 @@ describe('Ethereum Signatures', () => {
 
         // Instantiate program
 
-        program = new Program<Signatures>(
-            SignaturesIDL,
-            anchor.workspace.Signatures.programId,
-            provider
-        );
+        program = anchor.workspace.Signatures as Program<Signatures>;
 
         // Signature
 
