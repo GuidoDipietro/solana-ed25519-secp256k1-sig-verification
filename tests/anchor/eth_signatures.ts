@@ -3,6 +3,7 @@ import { Program } from '@coral-xyz/anchor';
 import { Signatures } from '../../target/types/signatures';
 import { ethers } from 'ethers';
 import * as assert from 'assert';
+import { sendAndLogMetrics } from './utils/metrics';
 
 // Note: The recovery byte for Secp256k1 signatures has an arbitrary constant of 27 added for these
 //       Ethereum and Bitcoin signatures. This is why you will see (recoveryId - 27) throughout the tests.
@@ -140,7 +141,7 @@ describe('Ethereum Signatures', () => {
 
             tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+            await sendAndLogMetrics(provider.connection, tx, 'Secp256k1');
 
             // If all goes well, we're good!
         } catch (error) {
@@ -203,7 +204,7 @@ describe('Ethereum Signatures', () => {
 
             tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+            await sendAndLogMetrics(provider.connection, tx, 'Secp256k1 - Chip');
 
             // If all goes well, we're good!
         } catch (error) {
