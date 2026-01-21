@@ -3,6 +3,7 @@ import { Program } from '@coral-xyz/anchor';
 import { Signatures } from '../../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
+import { sendAndLogMetrics } from './utils/metrics';
 
 describe('Solana signatures', () => {
     const provider = anchor.AnchorProvider.env();
@@ -82,7 +83,7 @@ describe('Solana signatures', () => {
 
             tx.sign(person);
 
-            await provider.connection.sendRawTransaction(tx.serialize());
+            await sendAndLogMetrics(provider.connection, tx, 'Ed25519');
 
             // If all goes well, we're good!
         } catch (error) {
