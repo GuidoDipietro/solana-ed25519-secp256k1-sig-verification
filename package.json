@@ -3,9 +3,9 @@
         "test": "RUST_LOG= anchor test"
     },
     "dependencies": {
-        "@coral-xyz/anchor": "0.28.0",
+        "@coral-xyz/anchor": "0.32.1",
         "@noble/ed25519": "^1.6.0",
-        "anchor-bankrun": "^0.3.0",
+        "anchor-bankrun": "^0.5.0",
         "solana-bankrun": "^0.3.0",
         "spl-token-bankrun": "^0.2.5",
         "ethers": "^5.6.2"

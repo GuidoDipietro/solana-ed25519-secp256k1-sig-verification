@@ -1,13 +1,12 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import {
-    Signatures,
-    IDL as SignaturesIDL,
-} from '../../target/types/signatures';
+import { Signatures } from '../../target/types/signatures';
 import * as ed from '@noble/ed25519';
 import * as assert from 'assert';
 import { BankrunProvider } from 'anchor-bankrun';
 import { ProgramTestContext, startAnchor } from 'solana-bankrun';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('Solana signatures', () => {
     let provider: BankrunProvider;
@@ -23,13 +22,15 @@ describe('Solana signatures', () => {
 
     before(async () => {
         // BankrunProvider setup
+        // Create a local test wallet for bankrun instead of using anchor.Wallet.local()
+        const payer = anchor.web3.Keypair.generate();
 
         context = await startAnchor(
             `./`,
             [],
             [
                 {
-                    address: anchor.Wallet.local().publicKey,
+                    address: payer.publicKey,
                     info: {
                         executable: false,
                         owner: anchor.web3.SystemProgram.programId,
@@ -49,15 +50,19 @@ describe('Solana signatures', () => {
             ]
         );
 
-        provider = new BankrunProvider(context, anchor.Wallet.local());
+        provider = new BankrunProvider(context, new anchor.Wallet(payer));
 
         anchor.setProvider(provider);
 
         // Instantiate program
-
+        // Load IDL from JSON file and programId from Anchor.toml
+        const idlPath = path.join(__dirname, '../../target/idl/signatures.json');
+        const idlJson = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+        const programId = new anchor.web3.PublicKey(idlJson.address);
+        
         program = new Program<Signatures>(
-            SignaturesIDL,
-            anchor.workspace.Signatures.programId,
+            idlJson as anchor.Idl,
+            programId,
             provider
         );
 

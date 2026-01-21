@@ -5,8 +5,8 @@
 //!
 
 use anchor_lang::prelude::*;
-use solana_program::instruction::Instruction;
-use solana_program::sysvar::instructions::{ID as IX_ID, load_instruction_at_checked};
+use anchor_lang::solana_program::instruction::Instruction;
+use anchor_lang::solana_program::sysvar::instructions::{ID as IX_ID, load_instruction_at_checked};
 
 pub mod utils;
 pub mod error;

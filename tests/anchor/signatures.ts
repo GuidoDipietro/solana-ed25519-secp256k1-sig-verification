@@ -148,7 +148,7 @@ describe('Solana signatures', () => {
         } catch (error) {
             assert.equal(
                 error.transactionMessage,
-                'Transaction precompile verification failure InvalidAccountIndex'
+                'Transaction simulation failed: Error processing Instruction 0: custom program error: 0x2'
             );
         }
     });
@@ -389,7 +389,7 @@ describe('Solana signatures', () => {
         } catch (error) {
             assert.equal(
                 error.transactionMessage,
-                'Transaction precompile verification failure InvalidAccountIndex'
+                'Transaction simulation failed: Error processing Instruction 0: custom program error: 0x2'
             );
         }
     });

@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
-use solana_program::instruction::Instruction;
-use solana_program::ed25519_program::ID as ED25519_ID;
+use anchor_lang::solana_program::instruction::Instruction;
 use crate::error::ErrorCode;
 
 use std::convert::TryInto;
+
+// Ed25519 program ID
+const ED25519_ID: Pubkey = pubkey!("Ed25519SigVerify111111111111111111111111111");
 
 /// Verify Ed25519Program instruction fields
 pub fn verify_ed25519_ix(ix: &Instruction, pubkey: &[u8], msg: &[u8], sig: &[u8]) -> Result<()> {
