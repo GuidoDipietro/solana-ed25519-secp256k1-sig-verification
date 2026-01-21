@@ -1,13 +1,12 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import {
-    Signatures,
-    IDL as SignaturesIDL,
-} from '../../target/types/signatures';
+import { Signatures } from '../../target/types/signatures';
 import { ethers } from 'ethers';
 import * as assert from 'assert';
 import { Clock, ProgramTestContext, startAnchor } from 'solana-bankrun';
 import { BankrunProvider } from 'anchor-bankrun';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Note: The recovery byte for Secp256k1 signatures has an arbitrary constant of 27 added for these
 //       Ethereum and Bitcoin signatures. This is why you will see (recoveryId - 27) throughout the tests.
@@ -55,13 +54,15 @@ describe('Ethereum Signatures', () => {
 
     before(async () => {
         // BankrunProvider setup
+        // Create a local test wallet for bankrun instead of using anchor.Wallet.local()
+        const payer = anchor.web3.Keypair.generate();
 
         context = await startAnchor(
             `./`,
             [],
             [
                 {
-                    address: anchor.Wallet.local().publicKey,
+                    address: payer.publicKey,
                     info: {
                         executable: false,
                         owner: anchor.web3.SystemProgram.programId,
@@ -81,15 +82,19 @@ describe('Ethereum Signatures', () => {
             ]
         );
 
-        provider = new BankrunProvider(context, anchor.Wallet.local());
+        provider = new BankrunProvider(context, new anchor.Wallet(payer));
 
         anchor.setProvider(provider);
 
         // Instantiate program
-
+        // Load IDL from JSON file
+        const idlPath = path.join(__dirname, '../../target/idl/signatures.json');
+        const idlJson = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+        const programId = new anchor.web3.PublicKey(idlJson.address);
+        
         program = new Program<Signatures>(
-            SignaturesIDL,
-            anchor.workspace.Signatures.programId,
+            idlJson as anchor.Idl,
+            programId,
             provider
         );
 

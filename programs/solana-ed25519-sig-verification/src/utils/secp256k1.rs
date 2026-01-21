@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
-use solana_program::instruction::Instruction;
-use solana_program::secp256k1_program::ID as SECP256K1_ID;
+use anchor_lang::solana_program::instruction::Instruction;
 use crate::error::ErrorCode;
 
 use std::convert::TryInto;
+
+// Secp256k1 program ID
+const SECP256K1_ID: Pubkey = pubkey!("KeccakSecp256k11111111111111111111111111111");
 
 /// Verify Secp256k1Program instruction fields
 pub fn verify_secp256k1_ix(ix: &Instruction, eth_address: &[u8], msg: &[u8], sig: &[u8], recovery_id: u8) -> Result<()> {
